@@ -21,9 +21,10 @@ class User {
                              password,
                              first_name,
                              last_name,
-                             phone)
+                             phone,
+                             join_at)
          VALUES
-           ($1, $2, $3, $4, $5 )
+           ($1, $2, $3, $4, $5, current_timestamp)
          RETURNING username, password, first_name, last_name, phone`,
       [username, hashedPassword, first_name, last_name, phone]);
 
@@ -65,7 +66,7 @@ class User {
         FROM users`);
     return result.rows;
   }
-   
+
 
   /** Get: get user by username
    *
@@ -87,29 +88,41 @@ class User {
           FROM users
           WHERE username = $1`,
       [username]);
+
+    if (!result.rows[0]) {
+      throw new NotFoundError(`${username} cannot be found`)
+    }
+
     return result.rows[0];
   }
 
   /** Return messages from this user.
    *
-   * [{id, to_user, body, sent_at, read_at}]
+   * [{id, to_user, body, sent_at, read_at}, ...]
    *
    * where to_user is
    *   {username, first_name, last_name, phone}
    */
 
-  static async messagesFrom(username) {
-    const result = await db.query(
-      `SELECT username,
-              first_name,
-              last_name,
-              phone,
-              join_at,
-              last_login_at
-          FROM users
-          WHERE username = $1`,
-      [username]);
-    return result.rows[0];
+  static async messagesFrom(usr) {
+    const messageResult = await db.query(
+      `SELECT id,
+              body,
+              sent_at,
+              read_at
+          FROM messages
+          WHERE from_username = $1`,
+      [usr]);
+
+    const messages = messageResult.rows;
+    const { username, first_name, last_name, phone } = await User.get(usr);
+    const basicUser = { username, first_name, last_name, phone };
+
+    for (let message of messages) {
+      message.to_user = basicUser;
+    }
+
+    return messages;
   }
 
   /** Return messages to this user.
@@ -120,7 +133,25 @@ class User {
    *   {username, first_name, last_name, phone}
    */
 
-  static async messagesTo(username) {
+  static async messagesTo(usr) {
+    const messageResult = await db.query(
+      `SELECT id,
+              body,
+              sent_at,
+              read_at
+          FROM messages
+          WHERE to_username = $1`,
+      [usr]);
+
+    const messages = messageResult.rows;
+    const { username, first_name, last_name, phone } = await User.get(usr);
+    const basicUser = { username, first_name, last_name, phone };
+
+    for (let message of messages) {
+      message.from_user = basicUser;
+    }
+
+    return messages;
   }
 }
 
