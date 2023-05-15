@@ -14,7 +14,7 @@ class User {
    */
 
   static async register({ username, password, first_name, last_name, phone }) {
-    const hashedPassword = bcrypt.hash(password, BCRYPT_WORK_FACTOR);
+    const hashedPassword = await bcrypt.hash(password, BCRYPT_WORK_FACTOR);
 
     const result = await db.query(
       `INSERT INTO users (username,
@@ -48,7 +48,7 @@ class User {
   /** Update last_login_at for user */
 
   static async updateLoginTimestamp(username) {
-    await db.query(
+   await db.query(
       `UPDATE users
           SET last_login_at = current_timestamp
           WHERE username = $1`,
@@ -78,6 +78,7 @@ class User {
    *          last_login_at } */
 
   static async get(username) {
+
     const result = await db.query(
       `SELECT username,
               first_name,
@@ -88,6 +89,7 @@ class User {
           FROM users
           WHERE username = $1`,
       [username]);
+
 
     if (!result.rows[0]) {
       throw new NotFoundError(`${username} cannot be found`)
@@ -108,6 +110,7 @@ class User {
     const messageResult = await db.query(
       `SELECT id,
               body,
+              to_username AS to_user,
               sent_at,
               read_at
           FROM messages
@@ -115,11 +118,10 @@ class User {
       [usr]);
 
     const messages = messageResult.rows;
-    const { username, first_name, last_name, phone } = await User.get(usr);
-    const basicUser = { username, first_name, last_name, phone };
 
     for (let message of messages) {
-      message.to_user = basicUser;
+      const { username, first_name, last_name, phone } = await User.get(message.to_user);
+      message.to_user = { username, first_name, last_name, phone };
     }
 
     return messages;
@@ -137,21 +139,21 @@ class User {
     const messageResult = await db.query(
       `SELECT id,
               body,
+              from_username AS from_user,
               sent_at,
               read_at
           FROM messages
           WHERE to_username = $1`,
       [usr]);
 
-    const messages = messageResult.rows;
-    const { username, first_name, last_name, phone } = await User.get(usr);
-    const basicUser = { username, first_name, last_name, phone };
+      const messages = messageResult.rows;
 
-    for (let message of messages) {
-      message.from_user = basicUser;
-    }
-
-    return messages;
+      for (let message of messages) {
+        const { username, first_name, last_name, phone } = await User.get(message.from_user);
+        message.from_user = { username, first_name, last_name, phone };
+      }
+  
+      return messages;
   }
 }
 
