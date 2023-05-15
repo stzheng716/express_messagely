@@ -15,9 +15,9 @@ class User {
 
   static async register({ username, password, first_name, last_name, phone }) {
     const hashedPassword = await bcrypt.hash(password, BCRYPT_WORK_FACTOR);
-
-    const result = await db.query(
-      `INSERT INTO users (username,
+    try {
+      const result = await db.query(
+        `INSERT INTO users (username,
                              password,
                              first_name,
                              last_name,
@@ -27,9 +27,12 @@ class User {
          VALUES
            ($1, $2, $3, $4, $5, current_timestamp, current_timestamp)
          RETURNING username, password, first_name, last_name, phone`,
-      [username, hashedPassword, first_name, last_name, phone]);
+        [username, hashedPassword, first_name, last_name, phone]);
 
-    return result.rows[0];
+      return result.rows[0];
+    } catch (err) {
+      throw new UnauthorizedError("username already exist")
+    }
   }
 
   /** Authenticate: is username/password valid? Returns boolean. */
@@ -50,7 +53,7 @@ class User {
   /** Update last_login_at for user */
 
   static async updateLoginTimestamp(username) {
-   const result = await db.query(
+    const result = await db.query(
       `UPDATE users
           SET last_login_at = current_timestamp
           WHERE username = $1
