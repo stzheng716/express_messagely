@@ -2,7 +2,7 @@
 
 /** User of the site. */
 
-const { NotFoundError, UnauthorizedError } = require("../expressError");
+const { NotFoundError, UnauthorizedError, BadRequestError } = require("../expressError");
 const db = require("../db");
 const bcrypt = require("bcrypt");
 const { SECRET_KEY, BCRYPT_WORK_FACTOR } = require("../config")
@@ -22,9 +22,10 @@ class User {
                              first_name,
                              last_name,
                              phone,
-                             join_at)
+                             join_at,
+                             last_login_at)
          VALUES
-           ($1, $2, $3, $4, $5, current_timestamp)
+           ($1, $2, $3, $4, $5, current_timestamp, current_timestamp)
          RETURNING username, password, first_name, last_name, phone`,
       [username, hashedPassword, first_name, last_name, phone]);
 
@@ -39,21 +40,29 @@ class User {
           FROM users
           WHERE username = $1`,
       [username]);
+    //TODO: 1. username DNE 2. wrong password
 
     const user = result.rows[0]
 
-    return await bcrypt.compare(password, user.password)
+    return user && await bcrypt.compare(password, user.password) === true;
   }
 
   /** Update last_login_at for user */
 
   static async updateLoginTimestamp(username) {
-   await db.query(
+   const result = await db.query(
       `UPDATE users
           SET last_login_at = current_timestamp
-          WHERE username = $1`,
+          WHERE username = $1
+        RETURNING username`,
       [username]);
+
+    if (!result.rows[0]) {
+      throw new NotFoundError(`${username} not found`)
+    }
   }
+
+  //TODO: UPDATE / DELETE: test for username existing (throw Errors in DNE)
 
   /** All: basic info on all users:
    * [{username, first_name, last_name}, ...] */
@@ -63,7 +72,8 @@ class User {
       `SELECT username,
          first_name,
          last_name
-        FROM users`);
+        FROM users
+        ORDER BY username`);
     return result.rows;
   }
 
@@ -78,7 +88,6 @@ class User {
    *          last_login_at } */
 
   static async get(username) {
-
     const result = await db.query(
       `SELECT username,
               first_name,
@@ -89,7 +98,6 @@ class User {
           FROM users
           WHERE username = $1`,
       [username]);
-
 
     if (!result.rows[0]) {
       throw new NotFoundError(`${username} cannot be found`)
@@ -107,24 +115,39 @@ class User {
    */
 
   static async messagesFrom(usr) {
-    const messageResult = await db.query(
-      `SELECT id,
-              body,
-              to_username AS to_user,
-              sent_at,
-              read_at
-          FROM messages
-          WHERE from_username = $1`,
+    const result = await db.query(
+      `SELECT m.id,
+              m.body,
+              m.to_username,
+              m.sent_at,
+              m.read_at,
+              u.username,
+              u.first_name,
+              u.last_name,
+              u.phone
+          FROM messages AS m
+          JOIN users AS u
+            ON m.to_username = u.username
+          WHERE m.from_username = $1`,
       [usr]);
 
-    const messages = messageResult.rows;
+    const messages = result.rows;
+    const formattedMessages = messages.map(msg => {
+      return {
+        id: msg.id,
+        to_user: {
+          username: msg.username,
+          first_name: msg.first_name,
+          last_name: msg.last_name,
+          phone: msg.phone
+        },
+        body: msg.body,
+        sent_at: msg.sent_at,
+        read_at: msg.read_at
+      }
+    });
 
-    for (let message of messages) {
-      const { username, first_name, last_name, phone } = await User.get(message.to_user);
-      message.to_user = { username, first_name, last_name, phone };
-    }
-
-    return messages;
+    return formattedMessages;
   }
 
   /** Return messages to this user.
@@ -136,24 +159,39 @@ class User {
    */
 
   static async messagesTo(usr) {
-    const messageResult = await db.query(
-      `SELECT id,
-              body,
-              from_username AS from_user,
-              sent_at,
-              read_at
-          FROM messages
-          WHERE to_username = $1`,
+    const result = await db.query(
+      `SELECT m.id,
+              m.body,
+              m.from_username,
+              m.sent_at,
+              m.read_at,
+              u.username,
+              u.first_name,
+              u.last_name,
+              u.phone
+          FROM messages AS m
+          JOIN users AS u
+            ON m.from_username = u.username
+          WHERE m.to_username = $1`,
       [usr]);
 
-      const messages = messageResult.rows;
-
-      for (let message of messages) {
-        const { username, first_name, last_name, phone } = await User.get(message.from_user);
-        message.from_user = { username, first_name, last_name, phone };
+    const messages = result.rows;
+    const formattedMessages = messages.map(msg => {
+      return {
+        id: msg.id,
+        from_user: {
+          username: msg.username,
+          first_name: msg.first_name,
+          last_name: msg.last_name,
+          phone: msg.phone
+        },
+        body: msg.body,
+        sent_at: msg.sent_at,
+        read_at: msg.read_at
       }
-  
-      return messages;
+    });
+
+    return formattedMessages;
   }
 }
 
