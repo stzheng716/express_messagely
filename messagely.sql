@@ -23,6 +23,11 @@ CREATE TABLE messages (
   sent_at TIMESTAMP WITH TIME ZONE NOT NULL,
   read_at TIMESTAMP WITH TIME ZONE);
 
+CREATE TABLE resets (
+  username TEXT PRIMARY KEY,
+  code TEXT NOT NULL
+)
+
 INSERT INTO users (username, password, first_name, last_name, phone, join_at, last_login_at)
   VALUES
     ('johny-chongy', 'password', 'john', 'chong', '5465', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),

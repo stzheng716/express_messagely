@@ -43,12 +43,16 @@ router.get("/:id", async function (req, res, next) {
  **/
 router.post("/", async function (req, res, next) {
   const from_username = res.locals.user.username;
-  const { to_username, body } = req.body;
+  const { to_username, to_phone, body } = req.body;
+  let message;
 
-  if (!to_username || !body) {
-    throw new BadRequestError("to_username and body are required.")
+  if (!body) {
+    throw new BadRequestError("body required.")
+  } else if (!to_phone) {
+    message = await Message.create({ from_username, to_username, body });
+  } else {
+    message = await Message.sendSms({to_phone, body});
   }
-  const message = await Message.create({ from_username, to_username, body });
 
   return res.json({ message });
 })

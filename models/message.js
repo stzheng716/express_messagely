@@ -3,7 +3,9 @@
 /** Message class for message.ly */
 
 const { NotFoundError } = require("../expressError");
+const { ACCOUNT_SID, AUTH_TOKEN, TWILIO_NUM } = require("../config.js");
 const db = require("../db");
+const client = require('twilio')(ACCOUNT_SID, AUTH_TOKEN);
 
 /** Message on the site. */
 
@@ -26,6 +28,23 @@ class Message {
 
     return result.rows[0];
   }
+
+  static async sendSms({ to_phone, body }) {
+    const result = await client.messages
+      .create({
+        body: body,
+        from: TWILIO_NUM,
+        to: to_phone
+      })
+
+      return {
+              id:1,
+              from_username: TWILIO_NUM,
+              to_username: to_phone,
+              body: body,
+              sent_at:result.dateCreated
+             }
+    }
 
   /** Update read_at for message
    *
