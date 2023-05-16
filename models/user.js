@@ -14,6 +14,10 @@ class User {
    */
 
   static async register({ username, password, first_name, last_name, phone }) {
+    if (!(username && password && first_name && last_name && phone )) {
+      throw new BadRequestError(`Invalid inputs`)
+    }
+
     const hashedPassword = await bcrypt.hash(password, BCRYPT_WORK_FACTOR);
     try {
       const result = await db.query(
