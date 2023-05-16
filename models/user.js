@@ -28,7 +28,6 @@ class User {
            ($1, $2, $3, $4, $5, current_timestamp, current_timestamp)
          RETURNING username, password, first_name, last_name, phone`,
         [username, hashedPassword, first_name, last_name, phone]);
-
       return result.rows[0];
     } catch (err) {
       throw new UnauthorizedError("username already exist")

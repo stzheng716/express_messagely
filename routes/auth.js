@@ -1,14 +1,12 @@
 "use strict";
 
-const express = require("express");
 const Router = require("express").Router;
 const router = new Router();
 
-const db = require("../db");
 const jwt = require("jsonwebtoken")
 const { SECRET_KEY, BCRYPT_WORK_FACTOR } = require("../config")
 const { UnauthorizedError, BadRequestError } = require("../expressError");
-const { User } = require("../models/user")
+const User  = require("../models/user")
 
 /** POST /login: {username, password} => {token} */
 
@@ -30,10 +28,9 @@ router.post("/login", async function(req, res){
 
 router.post("/register", async function(req, res){
     if(req.body === undefined) throw new BadRequestError();
-    
-    await User.register(req.body)
-    const { username, password } = req.body;
 
+    const registered = await User.register(req.body);
+    const { username, password } = req.body;
 
     if( await User.authenticate( username, password )){
         const token = jwt.sign({ username }, SECRET_KEY);
